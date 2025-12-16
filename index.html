@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Brocki Buchpreis-Suche</title>
+  <title>Brocki Buchsuche</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -14,6 +14,11 @@
       font-size: 1.1em;
       padding: 8px;
       margin-right: 5px;
+      margin-bottom: 10px;
+      width: calc(100% - 110px);
+    }
+    button {
+      width: 100px;
     }
     #result {
       margin-top: 20px;
@@ -33,55 +38,7 @@
 </head>
 <body>
 
-  <h1>📚 Brocki Buchpreis-Suche</h1>
+  <h1>📚 Brocki Buchsuche</h1>
 
-  <input id="isbn" placeholder="ISBN eingeben">
-  <button onclick="searchBook()">Suchen</button>
-
-  <div id="result"></div>
-
-  <script>
-    async function searchBook() {
-      const isbn = document.getElementById("isbn").value.trim();
-      if (!isbn) return;
-      const resultDiv = document.getElementById("result");
-      resultDiv.innerHTML = "🔍 Suche läuft…";
-
-      try {
-        // 📘 Google Books API
-        const gb = await fetch("https://www.googleapis.com/books/v1/volumes?q=isbn:" + isbn);
-        const gbData = await gb.json();
-
-        if (!gbData.items) {
-          resultDiv.innerHTML = "❌ Buch nicht gefunden";
-          return;
-        }
-
-        const info = gbData.items[0].volumeInfo;
-        const title = info.title || "–";
-        const author = info.authors ? info.authors.join(", ") : "–";
-
-        // HTML-Ausgabe
-        let html = "<h2>" + title + "</h2>";
-        html += "<p><b>Autor:</b> " + author + "</p>";
-
-     // 🔗 Shop‑Links
-html += "<h3>📖 Preise & Shops:</h3>";
-html += "<a href='https://www.orellfuessli.ch/shop/home/search?q=" + isbn + "&search_by=isbn' target='_blank'>Orell Füssli Shop (Neupreis)</a>";
-html += "<a href='https://diebuchsuche.ch/?search=" + isbn + "' target='_blank'>DieBuchSuche.ch (Preisvergleich CH)</a>";
-html += "<a href='https://www.billigbuch.ch/search?term=" + isbn + "' target='_blank'>billigbuch.ch (Preisvergleich)</a>";
-html += "<a href='https://www.eurobuch.de/ISBN/SUCHE?q=" + isbn + "' target='_blank'>Eurobuch (Preisvergleich)</a>";
-html += "<a href='https://www.amazon.de/s?k=" + isbn + "' target='_blank'>Amazon.de</a>";
-
-
-        resultDiv.innerHTML = html;
-
-      } catch (e) {
-        resultDiv.innerHTML = "⚠️ Fehler bei der Suche";
-        console.error(e);
-      }
-    }
-  </script>
-
-</body>
-</html>
+  <input id="searchText" placeholder="ISBN, Titel oder Autor eingeben">
+  <button onclick="s
