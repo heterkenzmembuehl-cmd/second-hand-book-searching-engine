@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Brocki Buchsuche</title>
+  <title>Brocki Buchsuche mit Preisvorschlag</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -35,7 +35,7 @@
 </head>
 <body>
 
-  <h1>📚 Brocki Buchsuche</h1>
+  <h1>📚 Brocki Buchsuche mit Preisvorschlag</h1>
 
   <input id="searchText" placeholder="ISBN, Titel oder Autor eingeben">
   <button onclick="searchBook()">Suchen</button>
@@ -54,17 +54,22 @@
 
       resultDiv.innerHTML = "<p>🔍 Suche läuft…</p>";
 
-      // EncodeURIComponent, damit Sonderzeichen in URL korrekt sind
+      // EncodeURIComponent für URL
       const encodedQuery = encodeURIComponent(query);
 
-      // Links zu Shops generieren
+      // Shop-Links
       const orellLink = "https://www.orellfuessli.ch/shop/home/search?q=" + encodedQuery;
       const exlibrisLink = "https://www.exlibris.ch/de/suche?searchTerm=" + encodedQuery;
 
-      // Ergebnis anzeigen
+      // Fiktiver Neupreis (kann später aus Datenbank/JSON kommen)
+      const neupreis = 25; // Beispielpreis in CHF
+      const verkaufspreis = (neupreis / 5).toFixed(2);
+
+      // Ausgabe
       let html = "<h3>Ergebnisse:</h3>";
       html += "<p>Gefunden bei <b>Orell Füssli</b>: <a href='" + orellLink + "' target='_blank'>Link anklicken</a></p>";
       html += "<p>Gefunden bei <b>Ex Libris</b>: <a href='" + exlibrisLink + "' target='_blank'>Link anklicken</a></p>";
+      html += "<p>💰 Preisvorschlag: <b>" + verkaufspreis + " CHF</b> (1/5 vom Neupreis)</p>";
 
       resultDiv.innerHTML = html;
     }
