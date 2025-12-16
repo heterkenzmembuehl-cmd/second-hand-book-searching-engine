@@ -1,188 +1,100 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <title>Google Books Trendanalyse (Deutsch)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Google Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card: rgba(255, 255, 255, 0.08);
-      --border: rgba(255, 255, 255, 0.15);
-      --text: #e5e7eb;
-      --accent: #38bdf8;
-    }
-
-    * {
-      box-sizing: border-box;
-      font-family: "Inter", sans-serif;
-    }
-
-    body {
-      margin: 0;
-      background: radial-gradient(circle at top, #1e293b, #020617);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .container {
-      width: 90%;
-      max-width: 1000px;
-      background: var(--card);
-      backdrop-filter: blur(14px);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 32px;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.4);
-    }
-
-    h1 {
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-
-    p {
-      opacity: 0.8;
-      margin-bottom: 24px;
-    }
-
-    .controls {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
-
-    input {
-      flex: 1;
-      padding: 14px 16px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      font-size: 16px;
-    }
-
-    button {
-      padding: 14px 22px;
-      border-radius: 12px;
-      border: none;
-      background: linear-gradient(135deg, #38bdf8, #0ea5e9);
-      color: #020617;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s ease, opacity 0.2s ease;
-    }
-
-    button:hover {
-      transform: translateY(-2px);
-      opacity: 0.9;
-    }
-
-    canvas {
-      margin-top: 10px;
-    }
-
-    footer {
-      margin-top: 20px;
-      font-size: 12px;
-      opacity: 0.6;
-      text-align: center;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BücherBrocki</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
+<body class="bg-gray-50 font-sans">
+  <header class="bg-white shadow p-4">
+    <h1 class="text-2xl font-bold text-gray-800 text-center">BücherBrocki</h1>
+  </header>
 
-<body>
-  <div class="container">
-    <h1>Google Books Trendanalyse</h1>
-    <p>
-      Deutsches Google-Books-Korpus (2019) · Zeitraum 2000–2019 · relative Worthäufigkeit
-    </p>
-
-    <div class="controls">
-      <input id="termInput" placeholder="Begriff(e) eingeben, z. B. Digitalisierung, KI, Nachhaltigkeit" />
-      <button onclick="loadTrend()">Analyse starten</button>
+  <main class="max-w-4xl mx-auto p-6">
+    <div class="mb-6">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Buch suchen (Titel, Autor, ISBN)..."
+        class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+      >
     </div>
 
-    <canvas id="chart" height="120"></canvas>
-
-    <footer>
-      Datenquelle: Google Books Ngram Viewer · normierte Tokenhäufigkeit
-    </footer>
-  </div>
+    <div id="results" class="grid grid-cols-1 gap-4"></div>
+  </main>
 
   <script>
-    const ctx = document.getElementById("chart").getContext("2d");
-    let chart;
+    const searchInput = document.getElementById('searchInput');
+    const resultsDiv = document.getElementById('results');
 
-    async function loadTrend() {
-      const terms = document.getElementById("termInput").value.trim();
-      if (!terms) return;
+    // Mapping-Tabelle für bekannte Verlage
+    const publisherLinks = {
+      "O'Reilly Media": "https://www.oreilly.com",
+      "Springer": "https://www.springer.com",
+      "Penguin": "https://www.penguin.com",
+      "Pearson": "https://www.pearson.com",
+      "Random House": "https://www.randomhouse.com",
+      "Rowohlt": "https://www.rowohlt.de",
+      "Bertelsmann": "https://www.bertelsmann.de"
+    };
 
-      const url = `https://books.google.com/ngrams/json?content=${encodeURIComponent(
-        terms
-      )}&year_start=2000&year_end=2019&corpus=31&smoothing=0`;
+    searchInput.addEventListener('keypress', function(event) {
+      if (event.key === 'Enter') {
+        searchBooks(searchInput.value);
+      }
+    });
 
-      const response = await fetch(url);
-      const data = await response.json();
+    async function searchBooks(query) {
+      if (!query) return;
 
-      const labels = Array.from({ length: 20 }, (_, i) => 2000 + i);
+      resultsDiv.innerHTML = '<p class="text-gray-500">Lade Ergebnisse...</p>';
 
-      const datasets = data.map((entry, index) => ({
-        label: entry.ngram,
-        data: entry.timeseries,
-        borderWidth: 2,
-        tension: 0.25,
-        fill: false
-      }));
+      try {
+        const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10`);
+        const data = await response.json();
 
-      if (chart) chart.destroy();
-
-      chart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels,
-          datasets
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: {
-              labels: {
-                color: "#e5e7eb"
-              }
-            }
-          },
-          scales: {
-            x: {
-              title: {
-                display: true,
-                text: "Jahr",
-                color: "#e5e7eb"
-              },
-              ticks: { color: "#e5e7eb" }
-            },
-            y: {
-              title: {
-                display: true,
-                text: "Relative Häufigkeit",
-                color: "#e5e7eb"
-              },
-              ticks: { color: "#e5e7eb" }
-            }
-          }
+        if (!data.items) {
+          resultsDiv.innerHTML = '<p class="text-red-500">Keine Bücher gefunden.</p>';
+          return;
         }
-      });
+
+        resultsDiv.innerHTML = '';
+        data.items.forEach(item => {
+          const info = item.volumeInfo;
+          const sale = item.saleInfo;
+
+          const authors = info.authors ? info.authors.join(', ') : 'Unbekannt';
+          const publisher = info.publisher || 'Unbekannt';
+          const publishedDate = info.publishedDate || 'Unbekannt';
+          const isbn = (info.industryIdentifiers && info.industryIdentifiers.find(id => id.type === 'ISBN_13')) 
+                        ? info.industryIdentifiers.find(id => id.type === 'ISBN_13').identifier 
+                        : 'Nicht verfügbar';
+          const price = sale.saleability === 'FOR_SALE' && sale.listPrice 
+                        ? `${sale.listPrice.amount} ${sale.listPrice.currencyCode}` 
+                        : 'Nicht verfügbar';
+
+          const publisherLink = publisherLinks[publisher] || null;
+
+          const bookCard = document.createElement('div');
+          bookCard.className = 'bg-white p-4 rounded-lg shadow hover:shadow-md transition';
+          bookCard.innerHTML = `
+            <h2 class="text-xl font-semibold text-gray-800">${info.title}</h2>
+            <p class="text-gray-600">Autor: ${authors}</p>
+            <p class="text-gray-600">
+              Verlag: ${publisherLink ? `<a href="${publisherLink}" target="_blank" class="text-blue-500 hover:underline">${publisher}</a>` : publisher}
+            </p>
+            <p class="text-gray-600">Erscheinungsjahr: ${publishedDate}</p>
+            <p class="text-gray-600">ISBN: ${isbn}</p>
+            <p class="text-gray-600">Preis: ${price}</p>
+          `;
+          resultsDiv.appendChild(bookCard);
+        });
+
+      } catch (error) {
+        resultsDiv.innerHTML = '<p class="text-red-500">Fehler beim Laden der Bücher.</p>';
+        console.error(error);
+      }
     }
   </script>
 </body>
