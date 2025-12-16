@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Brocki Buchsuche v1.0</title>
+  <title>Brocki Buchsuche v1.1</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 750px; margin: 40px auto; padding: 10px; }
     input, button { font-size: 1.1em; padding: 8px; margin-bottom: 10px; width: 100%; }
@@ -14,6 +14,7 @@
     a { display: inline-block; margin: 2px 5px 2px 0; color: #0066cc; text-decoration: none; }
     a:hover { text-decoration: underline; }
     #version { margin-top: 30px; font-size: 0.9em; color: #666; }
+    .eurobuch-form { margin-top: 10px; padding: 10px; border: 1px solid #aaa; background-color: #f0f0f0; width: fit-content; }
   </style>
 </head>
 <body>
@@ -25,7 +26,7 @@
 
 <div id="result"></div>
 
-<div id="version">Version 1.0</div>
+<div id="version">Version 1.1</div>
 
 <script>
 async function searchBook() {
@@ -40,7 +41,7 @@ async function searchBook() {
   resDiv.innerHTML = "<p>🔍 Suche läuft…</p>";
 
   try {
-    // ===== Open Library API =====
+    // Open Library Suche
     const resp = await fetch("https://openlibrary.org/search.json?q=" + encodeURIComponent(query));
     const data = await resp.json();
 
@@ -49,10 +50,102 @@ async function searchBook() {
       return;
     }
 
-    const books = data.docs.slice(0, 5); // Top 5 Ergebnisse
+    const books = data.docs.slice(0, 5);
     let html = "";
 
     books.forEach(book => {
       const title = book.title || "–";
       const author = book.author_name ? book.author_name.join(", ") : "–";
-      const isbn
+      const isbn = book.isbn ? book.isbn[0] : "";
+
+      // Coverbild
+      const coverUrl = isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg` : "";
+
+      // Fiktiver Neupreis
+      const neupreis = 25; // CHF
+      const verkaufspreis = (neupreis / 5).toFixed(2);
+
+      // Shoplinks
+      const orellLink = `https://www.orellfuessli.ch/shop/home/search?q=${encodeURIComponent(query)}`;
+      const exlibrisLink = `https://www.exlibris.ch/de/suche?searchTerm=${encodeURIComponent(query)}`;
+
+      html += `<div class="book">
+        <div class="cover">${coverUrl ? `<img src="${coverUrl}" alt="Cover">` : "Kein Cover verfügbar"}</div>
+        <div class="info">
+          <h2>${title}</h2>
+          <p><b>Autor:</b> ${author}</p>
+          ${isbn ? `<p><b>ISBN:</b> ${isbn}</p>` : "<p>⚠️ Keine ISBN gefunden.</p>"}
+          <p>💰 Preisvorschlag: <b>${verkaufspreis} CHF</b> (1/5 vom Neupreis)</p>
+          <p>
+            <a href="https://www.melando.ch/de/books?search=${encodeURIComponent(query)}" target="_blank">Melando</a>
+            <a href="https://www.medimops.de/search?query=${encodeURIComponent(query)}" target="_blank">Medimops</a>
+            <a href="https://www.zvab.com/search?q=${encodeURIComponent(query)}" target="_blank">ZVAB</a>
+            <a href="https://www.buchplanet.ch/?s=${encodeURIComponent(query)}" target="_blank">Buchplanet</a>
+          </p>
+          <p>
+            <a href="${orellLink}" target="_blank">Orell Füssli</a>
+            <a href="${exlibrisLink}" target="_blank">Ex Libris</a>
+          </p>
+        </div>
+      </div>`;
+
+      // Eurobuch Formular dynamisch erzeugen
+      const euroForm = document.createElement("form");
+      euroForm.method = "post";
+      euroForm.action = "https://www.eurobuch.ch/search_results.php";
+      euroForm.target = "_blank";
+      euroForm.className = "eurobuch-form";
+
+      // Autor
+      const inputAuthor = document.createElement("input");
+      inputAuthor.type = "hidden";
+      inputAuthor.name = "author";
+      inputAuthor.value = author;
+      euroForm.appendChild(inputAuthor);
+
+      // Titel
+      const inputTitle = document.createElement("input");
+      inputTitle.type = "hidden";
+      inputTitle.name = "title";
+      inputTitle.value = title;
+      euroForm.appendChild(inputTitle);
+
+      // Volltext
+      const inputSearch = document.createElement("input");
+      inputSearch.type = "hidden";
+      inputSearch.name = "search";
+      inputSearch.value = title;
+      euroForm.appendChild(inputSearch);
+
+      // ISBN
+      const inputISBN = document.createElement("input");
+      inputISBN.type = "hidden";
+      inputISBN.name = "isbn";
+      inputISBN.value = isbn;
+      euroForm.appendChild(inputISBN);
+
+      // Submit Button
+      const submitBtn = document.createElement("input");
+      submitBtn.type = "submit";
+      submitBtn.value = "Auf Eurobuch suchen";
+      euroForm.appendChild(submitBtn);
+
+      html += euroForm.outerHTML;
+    });
+
+    resDiv.innerHTML = html;
+
+  } catch (err) {
+    console.error(err);
+    resDiv.innerHTML = "<p>⚠️ Fehler bei der Suche.</p>";
+  }
+}
+
+// Enter-Taste aktivieren
+document.getElementById("searchText").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") searchBook();
+});
+</script>
+
+</body>
+</html>
