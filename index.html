@@ -7,45 +7,48 @@
 <style>
 body {
   font-family: Arial, sans-serif;
-  max-width: 900px;
+  max-width: 1000px;
   margin: 30px auto;
   padding: 10px;
 }
 input, button, select {
-  font-size: 1em;
   padding: 8px;
   margin: 4px 0;
   width: 100%;
 }
 .book {
-  display: flex;
   border-bottom: 1px solid #ccc;
   padding: 15px 0;
+  cursor: pointer;
+}
+.row {
+  display: flex;
 }
 .cover img {
-  width: 120px;
+  width: 140px;
 }
 .info {
   margin-left: 15px;
   flex: 1;
 }
-.price {
-  font-size: 1.3em;
+.newprice {
+  font-size: 1.6em;
+  color: #0a7;
   font-weight: bold;
 }
-.links a {
-  margin-right: 8px;
-  font-size: 0.9em;
+.detail {
+  display: none;
+  margin-top: 15px;
+  background: #f7f7f7;
+  padding: 15px;
 }
-.eurobuch {
-  background: #f0f0f0;
-  padding: 10px;
+canvas {
+  background: #fff;
+  border: 1px solid #ccc;
   margin-top: 10px;
-  border: 1px solid #aaa;
 }
 #version {
   margin-top: 30px;
-  font-size: 0.9em;
   color: #666;
 }
 </style>
@@ -60,122 +63,140 @@ input, button, select {
 
 <div id="results"></div>
 
-<div id="version">Version 1.4 – lernende Preisempfehlung</div>
+<div id="version">Version 1.6 – Metadaten & Nachfragegrafiken</div>
 
 <script>
-// ------------------ GRUNDLAGEN ------------------
-const BASE_PRICE = 25;
-const conditionFactor = {
-  "wie neu": 1.2,
-  "sehr gut": 1.0,
-  "gut": 0.8,
-  "akzeptabel": 0.6,
-  "beschädigt": 0.4
-};
-const demandFactor = {
-  "Bestseller": 1.3,
-  "Standard": 1.0,
-  "Nische": 0.8
-};
+const DEFAULT_BASE_PRICE = 25;
 
-// ------------------ SALES STORAGE ------------------
-function getSales() {
-  return JSON.parse(localStorage.getItem("sales") || "{}");
+// ---------- STORAGE ----------
+function getData(key) {
+  return JSON.parse(localStorage.getItem(key) || "{}");
 }
+function saveData(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
+}
+
+// ---------- GOOGLE BOOKS ----------
+async function googleBooks(isbn) {
+  if (!isbn) return null;
+  const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+  const j = await r.json();
+  if (!j.items) return null;
+  const v = j.items[0];
+  return {
+    title: v.volumeInfo.title,
+    authors: v.volumeInfo.authors?.join(", "),
+    publisher: v.volumeInfo.publisher || "–",
+    pages: v.volumeInfo.pageCount || "–",
+    year: v.volumeInfo.publishedDate?.substring(0,4) || "–",
+    cover: v.volumeInfo.imageLinks?.thumbnail || "",
+    price: v.saleInfo?.listPrice?.amount || null
+  };
+}
+
+// ---------- DEMAND ----------
+function logDemand(isbn) {
+  let d = getData("demand");
+  d[isbn] = d[isbn] || [];
+  d[isbn].push({ date: Date.now(), value: 1 });
+  saveData("demand", d);
+}
+
+// ---------- SALES ----------
 function saveSale(isbn, price) {
-  if (!isbn || !price) return alert("Preis oder ISBN fehlt");
-  let sales = getSales();
-  if (!sales[isbn]) sales[isbn] = [];
-  sales[isbn].push({ price: parseFloat(price), date: new Date().toISOString() });
-  localStorage.setItem("sales", JSON.stringify(sales));
-  alert("✅ Verkauf gespeichert");
-}
-function averageSale(isbn) {
-  let sales = getSales()[isbn];
-  if (!sales || sales.length === 0) return null;
-  return sales.reduce((a,b)=>a+b.price,0) / sales.length;
+  let s = getData("sales");
+  s[isbn] = s[isbn] || [];
+  s[isbn].push({ date: Date.now(), price: parseFloat(price) });
+  saveData("sales", s);
+  alert("Verkauf gespeichert");
 }
 
-// ------------------ PREISLOGIK ------------------
-function smartPrice(base, condition, demand, year, isbn) {
-  let ageFactor = 1 - ((new Date().getFullYear() - year) * 0.02);
-  ageFactor = Math.max(0.6, ageFactor);
-  let heuristic = base * conditionFactor[condition] * demandFactor[demand] * ageFactor;
-  let avg = averageSale(isbn);
-  if (!avg) return heuristic.toFixed(2);
-  return (heuristic * 0.6 + avg * 0.4).toFixed(2);
+// ---------- CHART ----------
+function drawChart(canvas, data, key) {
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if (data.length < 2) return;
+
+  const max = Math.max(...data.map(d=>d[key]));
+  ctx.beginPath();
+  data.forEach((d,i)=>{
+    const x = (i/(data.length-1))*canvas.width;
+    const y = canvas.height - (d[key]/max)*canvas.height;
+    ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle = "#0077cc";
+  ctx.stroke();
 }
 
-// ------------------ SUCHE ------------------
+// ---------- SEARCH ----------
 async function search() {
   const q = searchInput.value.trim();
   if (!q) return;
-  results.innerHTML = "🔍 Suche läuft…";
+  results.innerHTML = "Suche läuft…";
 
-  const res = await fetch("https://openlibrary.org/search.json?q=" + encodeURIComponent(q));
-  const data = await res.json();
-  if (!data.docs.length) return results.innerHTML = "❌ Keine Treffer";
-
+  const r = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}`);
+  const j = await r.json();
   results.innerHTML = "";
-  data.docs.slice(0,5).forEach(b => renderBook(b, q));
+
+  j.docs.slice(0,5).forEach(b=>renderBook(b));
 }
 
-// ------------------ RENDER ------------------
-function renderBook(b, q) {
+// ---------- RENDER ----------
+async function renderBook(b) {
   const isbn = b.isbn ? b.isbn[0] : "";
-  const year = b.first_publish_year || new Date().getFullYear();
-  const title = b.title || "";
-  const author = b.author_name ? b.author_name.join(", ") : "";
-  const cover = isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg` : "";
+  logDemand(isbn);
+
+  const g = await googleBooks(isbn);
 
   const div = document.createElement("div");
   div.className = "book";
+
   div.innerHTML = `
-    <div class="cover">${cover ? `<img src="${cover}">` : ""}</div>
-    <div class="info">
-      <h2>${title}</h2>
-      <p>${author}</p>
-      <p>ISBN: ${isbn || "–"} | Jahr: ${year}</p>
-
-      <label>Zustand</label>
-      <select class="condition">
-        <option>wie neu</option><option>sehr gut</option><option>gut</option>
-        <option>akzeptabel</option><option>beschädigt</option>
-      </select>
-
-      <label>Nachfrage</label>
-      <select class="demand">
-        <option>Bestseller</option><option>Standard</option><option>Nische</option>
-      </select>
-
-      <p class="price">Empfohlener Preis: <span>–</span> CHF</p>
-
-      <input type="number" placeholder="Verkaufspreis CHF" class="sale">
-      <button>Verkauf speichern</button>
-
-      <div class="links">
-        <a href="https://www.orellfuessli.ch/shop/home/search?q=${encodeURIComponent(q)}" target="_blank">Orell Füssli</a>
-        <a href="https://www.exlibris.ch/de/suche?searchTerm=${encodeURIComponent(q)}" target="_blank">Ex Libris</a>
-        <a href="https://www.eurobuch.ch/search_results.php?search=${encodeURIComponent(q)}" target="_blank">Eurobuch</a>
+    <div class="row">
+      <div class="cover">${g?.cover ? `<img src="${g.cover}">` : ""}</div>
+      <div class="info">
+        <h2>${g?.title || b.title}</h2>
+        <p><b>Autor:</b> ${g?.authors || "–"}</p>
+        <p><b>Verlag:</b> ${g?.publisher}</p>
+        <p><b>Seiten:</b> ${g?.pages}</p>
+        <p><b>Erscheinungsjahr:</b> ${g?.year}</p>
+        <p><b>ISBN:</b> ${isbn}</p>
+        ${g?.price ? `<div class="newprice">Neupreis: ${g.price} CHF</div>` : ""}
       </div>
     </div>
+
+    <div class="detail">
+      <h3>📈 Nachfrage</h3>
+      <canvas width="400" height="150"></canvas>
+
+      <h3>💰 Preisentwicklung</h3>
+      <canvas width="400" height="150"></canvas>
+
+      <input type="number" placeholder="Verkaufspreis CHF">
+      <button>Verkauf speichern</button>
+    </div>
   `;
+
+  div.onclick = () => {
+    const d = div.querySelector(".detail");
+    d.style.display = d.style.display === "block" ? "none" : "block";
+
+    const demand = getData("demand")[isbn] || [];
+    const sales = getData("sales")[isbn] || [];
+
+    drawChart(d.querySelectorAll("canvas")[0], demand.map((v,i)=>({v:i+1})), "v");
+    drawChart(d.querySelectorAll("canvas")[1], sales, "price");
+  };
+
+  div.querySelector("button").onclick = e => {
+    e.stopPropagation();
+    saveSale(isbn, div.querySelector("input").value);
+  };
+
   results.appendChild(div);
-
-  const priceSpan = div.querySelector(".price span");
-  const update = () => priceSpan.textContent =
-    smartPrice(BASE_PRICE, div.querySelector(".condition").value,
-      div.querySelector(".demand").value, year, isbn);
-
-  div.querySelector(".condition").onchange = update;
-  div.querySelector(".demand").onchange = update;
-  div.querySelector("button").onclick = () =>
-    saveSale(isbn, div.querySelector(".sale").value);
-
-  update();
 }
 
-// ENTER-TASTE
+// ENTER
 searchInput.addEventListener("keydown", e => {
   if (e.key === "Enter") search();
 });
