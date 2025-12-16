@@ -2,16 +2,17 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Brocki Buchsuche mit API</title>
+  <title>Brocki Buchsuche mit Open Library</title>
   <style>
-    body { font-family: Arial,sans-serif; max-width: 650px; margin: 40px auto; padding:10px;}
-    input, button { font-size:1.1em; padding:8px; margin-bottom:10px; width:100%;}
-    #result { margin-top:20px; border-top:1px solid #ccc; padding-top:15px;}
+    body { font-family: Arial, sans-serif; max-width: 650px; margin: 40px auto; padding:10px; }
+    input, button { font-size:1.1em; padding:8px; margin-bottom:10px; width:100%; }
+    #result { margin-top:20px; border-top:1px solid #ccc; padding-top:15px; }
+    .book { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
   </style>
 </head>
 <body>
 
-<h1>📚 Brocki Book API‑Suche</h1>
+<h1>📚 Brocki Buchsuche (Open Library API)</h1>
 
 <input id="searchText" placeholder="ISBN, Titel oder Autor">
 <button onclick="searchBook()">Suchen</button>
@@ -30,47 +31,35 @@ async function searchBook() {
   resDiv.innerHTML = "<p>🔍 Suche läuft…</p>";
 
   try {
-    // ======= Schritt 1: Open Library Suche =======
-    const openResp = await fetch(
-      "https://openlibrary.org/search.json?q=" + encodeURIComponent(query)
-    );
-    const openData = await openResp.json();
+    // ======= Open Library Suche =======
+    const resp = await fetch("https://openlibrary.org/search.json?q=" + encodeURIComponent(query));
+    const data = await resp.json();
 
-    if (!openData.docs || openData.docs.length === 0) {
-      resDiv.innerHTML = "<p>❌ Keine Daten gefunden.</p>";
+    if (!data.docs || data.docs.length === 0) {
+      resDiv.innerHTML = "<p>❌ Keine Bücher gefunden.</p>";
       return;
     }
 
-    const first = openData.docs[0];
-    const title = first.title || "–";
-    const author = first.author_name ? first.author_name.join(", ") : "–";
-    const isbn = first.isbn ? first.isbn[0] : null;
+    // Nur die ersten 5 Ergebnisse anzeigen
+    const books = data.docs.slice(0, 5);
+    let html = "";
 
-    let html = `<h2>${title}</h2><p><b>Autor:</b> ${author}</p>`;
+    books.forEach(book => {
+      const title = book.title || "–";
+      const author = book.author_name ? book.author_name.join(", ") : "–";
+      const isbn = book.isbn ? book.isbn[0] : null;
 
-    if (!isbn) {
-      html += "<p>⚠️ Keine ISBN gefunden.</p>";
-      resDiv.innerHTML = html;
-      return;
-    }
+      // Fiktiver Neupreis (kann später aus Datenbank/JSON kommen)
+      const neupreis = 25; // Beispiel CHF
+      const verkaufspreis = (neupreis / 5).toFixed(2);
 
-    html += `<p><b>ISBN:</b> ${isbn}</p>`;
-
-    // ======= Schritt 2: ValoreBooks Preis =======
-    const priceResp = await fetch(
-      "https://api.valorebooks.com/sellback/pricing/best/" + isbn
-    );
-    if (!priceResp.ok) {
-      html += "<p>⚠️ Kein ValoreBooks‑Preis verfügbar.</p>";
-    } else {
-      const priceJson = await priceResp.json();
-      const bestPrice = priceJson.price || 0;
-      const suggested = (bestPrice / 5).toFixed(2);
-
-      html +=
-        `<p>💰 Markt‑Preis (ValoreBooks): <b>${bestPrice} USD</b></p>` +
-        `<p>💡 Preisvorschlag (1/5): <b>${suggested} USD</b></p>`;
-    }
+      html += `<div class="book">
+        <h2>${title}</h2>
+        <p><b>Autor:</b> ${author}</p>
+        ${isbn ? `<p><b>ISBN:</b> ${isbn}</p>` : "<p>⚠️ Keine ISBN gefunden.</p>"}
+        <p>💰 Preisvorschlag: <b>${verkaufspreis} CHF</b> (1/5 vom Neupreis)</p>
+      </div>`;
+    });
 
     resDiv.innerHTML = html;
 
@@ -79,6 +68,11 @@ async function searchBook() {
     resDiv.innerHTML = "<p>⚠️ Fehler bei der Suche.</p>";
   }
 }
+
+// ======= Enter-Taste aktiviert =======
+document.getElementById("searchText").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") searchBook();
+});
 </script>
 
 </body>
