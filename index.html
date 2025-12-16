@@ -1,192 +1,189 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<title>Brocki Buchsuche</title>
+  <meta charset="UTF-8" />
+  <title>Google Books Trendanalyse (Deutsch)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<style>
-body {
-  font-family: Arial, sans-serif;
-  max-width: 1000px;
-  margin: 30px auto;
-  padding: 10px;
-}
-input, button {
-  padding: 8px;
-  margin: 4px 0;
-  width: 100%;
-}
-.book {
-  border-bottom: 1px solid #ccc;
-  padding: 15px 0;
-}
-.cover img {
-  width: 140px;
-}
-.row {
-  display: flex;
-}
-.info {
-  margin-left: 15px;
-}
-.newprice {
-  font-size: 1.6em;
-  color: #0a7;
-  font-weight: bold;
-}
-.detail {
-  display: none;
-  background: #f7f7f7;
-  padding: 15px;
-  margin-top: 10px;
-}
-.meant {
-  color: #d67c00;
-  font-style: italic;
-  margin-bottom: 10px;
-}
-#version {
-  margin-top: 30px;
-  color: #666;
-}
-a.publisher {
-  color: #0066cc;
-}
-</style>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: rgba(255, 255, 255, 0.08);
+      --border: rgba(255, 255, 255, 0.15);
+      --text: #e5e7eb;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: "Inter", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #1e293b, #020617);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      width: 90%;
+      max-width: 1000px;
+      background: var(--card);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+    }
+
+    h1 {
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    p {
+      opacity: 0.8;
+      margin-bottom: 24px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    input {
+      flex: 1;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      font-size: 16px;
+    }
+
+    button {
+      padding: 14px 22px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+      color: #020617;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      opacity: 0.9;
+    }
+
+    canvas {
+      margin-top: 10px;
+    }
+
+    footer {
+      margin-top: 20px;
+      font-size: 12px;
+      opacity: 0.6;
+      text-align: center;
+    }
+  </style>
 </head>
 
 <body>
+  <div class="container">
+    <h1>Google Books Trendanalyse</h1>
+    <p>
+      Deutsches Google-Books-Korpus (2019) · Zeitraum 2000–2019 · relative Worthäufigkeit
+    </p>
 
-<h1>📚 Brocki Buchsuche</h1>
-
-<input id="searchInput" placeholder="ISBN, Titel oder Autor">
-<button onclick="search()">Suchen</button>
-
-<div id="results"></div>
-
-<div id="version">Version 1.7 – Meintest du & Verlag-Link</div>
-
-<script>
-// ----------------- HILFSFUNKTIONEN -----------------
-
-function levenshtein(a, b) {
-  const m = [];
-  for (let i = 0; i <= b.length; i++) m[i] = [i];
-  for (let j = 0; j <= a.length; j++) m[0][j] = j;
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      m[i][j] = b.charAt(i-1) === a.charAt(j-1)
-        ? m[i-1][j-1]
-        : Math.min(m[i-1][j-1]+1, m[i][j-1]+1, m[i-1][j]+1);
-    }
-  }
-  return m[b.length][a.length];
-}
-
-function similarity(a, b) {
-  const dist = levenshtein(a.toLowerCase(), b.toLowerCase());
-  return 1 - dist / Math.max(a.length, b.length);
-}
-
-function publisherLink(name) {
-  if (!name) return null;
-  const domain = name.toLowerCase().replace(/[^a-z]/g,"");
-  return `https://www.${domain}.de`;
-}
-
-// ----------------- GOOGLE BOOKS -----------------
-async function googleBooks(isbn) {
-  if (!isbn) return null;
-  const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-  const j = await r.json();
-  if (!j.items) return null;
-  const v = j.items[0];
-  return {
-    title: v.volumeInfo.title,
-    authors: v.volumeInfo.authors?.join(", "),
-    publisher: v.volumeInfo.publisher || null,
-    year: v.volumeInfo.publishedDate?.substring(0,4) || null,
-    pages: v.volumeInfo.pageCount || null,
-    cover: v.volumeInfo.imageLinks?.thumbnail || "",
-    price: v.saleInfo?.listPrice?.amount || null
-  };
-}
-
-// ----------------- SUCHE -----------------
-async function search() {
-  const q = searchInput.value.trim();
-  if (!q) return;
-  results.innerHTML = "🔍 Suche läuft…";
-
-  const r = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}`);
-  const j = await r.json();
-  results.innerHTML = "";
-
-  let bestMatch = null;
-  let bestScore = 0;
-
-  j.docs.forEach(d => {
-    const title = d.title || "";
-    const s = similarity(q, title);
-    if (s > bestScore) {
-      bestScore = s;
-      bestMatch = title;
-    }
-  });
-
-  if (bestScore > 0.6 && bestScore < 0.9) {
-    results.innerHTML += `<div class="meant">Meintest du: <b>${bestMatch}</b>?</div>`;
-  }
-
-  j.docs.slice(0,5).forEach(b => renderBook(b));
-}
-
-// ----------------- RENDER -----------------
-async function renderBook(b) {
-  const isbn = b.isbn ? b.isbn[0] : "";
-  const g = await googleBooks(isbn);
-
-  const pubLink = g?.publisher ? publisherLink(g.publisher) : null;
-
-  const div = document.createElement("div");
-  div.className = "book";
-
-  div.innerHTML = `
-    <div class="row">
-      <div class="cover">${g?.cover ? `<img src="${g.cover}">` : ""}</div>
-      <div class="info">
-        <h2>${g?.title || b.title}</h2>
-        <p><b>Autor:</b> ${g?.authors || "–"}</p>
-        <p><b>ISBN:</b> ${isbn}</p>
-        <p><b>Seiten:</b> ${g?.pages || "–"}</p>
-        <p><b>Jahr:</b> ${g?.year || "–"}</p>
-        <p><b>Verlag:</b>
-          ${g?.publisher
-            ? `<a class="publisher" target="_blank" href="${pubLink}">${g.publisher}</a>`
-            : "–"}
-        </p>
-        ${g?.price ? `<div class="newprice">Neupreis: ${g.price} CHF</div>` : ""}
-      </div>
+    <div class="controls">
+      <input id="termInput" placeholder="Begriff(e) eingeben, z. B. Digitalisierung, KI, Nachhaltigkeit" />
+      <button onclick="loadTrend()">Analyse starten</button>
     </div>
 
-    <div class="detail">
-      <p>Weitere Auswertungen folgen…</p>
-    </div>
-  `;
+    <canvas id="chart" height="120"></canvas>
 
-  div.onclick = () => {
-    const d = div.querySelector(".detail");
-    d.style.display = d.style.display === "block" ? "none" : "block";
-  };
+    <footer>
+      Datenquelle: Google Books Ngram Viewer · normierte Tokenhäufigkeit
+    </footer>
+  </div>
 
-  results.appendChild(div);
-}
+  <script>
+    const ctx = document.getElementById("chart").getContext("2d");
+    let chart;
 
-// ENTER
-searchInput.addEventListener("keydown", e => {
-  if (e.key === "Enter") search();
-});
-</script>
+    async function loadTrend() {
+      const terms = document.getElementById("termInput").value.trim();
+      if (!terms) return;
 
+      const url = `https://books.google.com/ngrams/json?content=${encodeURIComponent(
+        terms
+      )}&year_start=2000&year_end=2019&corpus=31&smoothing=0`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const labels = Array.from({ length: 20 }, (_, i) => 2000 + i);
+
+      const datasets = data.map((entry, index) => ({
+        label: entry.ngram,
+        data: entry.timeseries,
+        borderWidth: 2,
+        tension: 0.25,
+        fill: false
+      }));
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              labels: {
+                color: "#e5e7eb"
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: "Jahr",
+                color: "#e5e7eb"
+              },
+              ticks: { color: "#e5e7eb" }
+            },
+            y: {
+              title: {
+                display: true,
+                text: "Relative Häufigkeit",
+                color: "#e5e7eb"
+              },
+              ticks: { color: "#e5e7eb" }
+            }
+          }
+        }
+      });
+    }
+  </script>
 </body>
 </html>
