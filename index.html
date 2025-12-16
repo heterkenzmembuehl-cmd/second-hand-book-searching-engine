@@ -20,4 +20,55 @@
     #result {
       margin-top: 20px;
       border-top: 1px solid #ccc;
-      padding-top:
+      padding-top: 15px;
+    }
+    a {
+      display: block;
+      margin: 5px 0;
+      color: #0066cc;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📚 Brocki Buchsuche</h1>
+
+  <input id="searchText" placeholder="ISBN, Titel oder Autor eingeben">
+  <button onclick="searchBook()">Suchen</button>
+
+  <div id="result"></div>
+
+  <script>
+    function searchBook() {
+      const query = document.getElementById("searchText").value.trim();
+      const resultDiv = document.getElementById("result");
+
+      if (!query) {
+        resultDiv.innerHTML = "<p>Bitte zuerst etwas eingeben.</p>";
+        return;
+      }
+
+      resultDiv.innerHTML = "<p>🔍 Suche läuft…</p>";
+
+      // EncodeURIComponent, damit Sonderzeichen in URL korrekt sind
+      const encodedQuery = encodeURIComponent(query);
+
+      // Links zu Shops generieren
+      const orellLink = "https://www.orellfuessli.ch/shop/home/search?q=" + encodedQuery;
+      const exlibrisLink = "https://www.exlibris.ch/de/suche?searchTerm=" + encodedQuery;
+
+      // Ergebnis anzeigen
+      let html = "<h3>Ergebnisse:</h3>";
+      html += "<p>Gefunden bei <b>Orell Füssli</b>: <a href='" + orellLink + "' target='_blank'>Link anklicken</a></p>";
+      html += "<p>Gefunden bei <b>Ex Libris</b>: <a href='" + exlibrisLink + "' target='_blank'>Link anklicken</a></p>";
+
+      resultDiv.innerHTML = html;
+    }
+  </script>
+
+</body>
+</html>
