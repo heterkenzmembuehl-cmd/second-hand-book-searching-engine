@@ -7,11 +7,14 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 font-sans">
-  <header class="bg-blue-200 shadow p-6">
-    <h1 class="text-4xl font-extrabold text-center text-gray-800">BücherBrocki</h1>
+  <!-- Header mit Titel und Versionsnummer -->
+  <header class="bg-blue-200 shadow p-6 flex flex-col items-center">
+    <h1 class="text-4xl font-extrabold text-gray-800 text-center mb-2">BücherBrocki</h1>
+    <span id="version" class="text-gray-700 text-sm">Version: 1.1</span>
   </header>
 
   <main class="max-w-5xl mx-auto p-6">
+    <!-- Suchfeld -->
     <div class="mb-6">
       <input
         type="text"
@@ -21,12 +24,20 @@
       >
     </div>
 
+    <!-- Anzeige Anzahl Ergebnisse -->
+    <div id="resultCount" class="text-gray-700 mb-4 text-lg"></div>
+
+    <!-- Container für Buchkarten -->
     <div id="results" class="grid grid-cols-1 gap-6"></div>
   </main>
 
   <script>
     const searchInput = document.getElementById('searchInput');
     const resultsDiv = document.getElementById('results');
+    const resultCountDiv = document.getElementById('resultCount');
+
+    const appVersion = '1.1'; // Versionsnummer
+    document.getElementById('version').textContent = `Version: ${appVersion}`;
 
     // Mapping-Tabelle für bekannte Verlage
     const publisherLinks = {
@@ -39,9 +50,10 @@
       "Bertelsmann": "https://www.bertelsmann.de"
     };
 
-    // Array mit Pastellfarben für Karten
+    // Pastellfarben für Karten
     const colors = ['bg-pink-100','bg-green-100','bg-yellow-100','bg-blue-100','bg-purple-100','bg-orange-100'];
 
+    // Enter-Taste Suche
     searchInput.addEventListener('keypress', function(event) {
       if (event.key === 'Enter') {
         searchBooks(searchInput.value);
@@ -52,15 +64,20 @@
       if (!query) return;
 
       resultsDiv.innerHTML = '<p class="text-gray-500 text-lg">Lade Ergebnisse...</p>';
+      resultCountDiv.textContent = '';
 
       try {
         const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10`);
         const data = await response.json();
 
-        if (!data.items) {
+        if (!data.items || data.items.length === 0) {
           resultsDiv.innerHTML = '<p class="text-red-500 text-lg">Keine Bücher gefunden.</p>';
+          resultCountDiv.textContent = '0 Ergebnisse gefunden';
           return;
         }
+
+        const totalResults = data.items.length;
+        resultCountDiv.textContent = `${totalResults} Ergebnis${totalResults > 1 ? 'se' : ''} gefunden`;
 
         resultsDiv.innerHTML = '';
         data.items.forEach(item => {
@@ -84,10 +101,15 @@
             if (sale.buyLink) priceLink = sale.buyLink;
           }
 
+          // Buchformat
+          let bookType = info.printType || 'Unbekannt';
+          if (sale.isEbook) bookType = 'eBook';
+          // Zusätzliche Formate aus Google Books (falls verfügbar)
+          if (sale.saleability === 'FOR_SALE' && sale.listPrice && sale.isEbook) bookType = 'eBook';
+          if (info.printType) bookType = info.printType;
+
           const thumbnail = info.imageLinks ? info.imageLinks.thumbnail : 'https://via.placeholder.com/128x200?text=Kein+Bild';
           const publisherLink = publisherLinks[publisher] || null;
-
-          // Zufällige Farbe für die Karte
           const bgColor = colors[Math.floor(Math.random() * colors.length)];
 
           const bookCard = document.createElement('div');
@@ -100,6 +122,7 @@
               <p class="text-gray-700"><span class="font-semibold">Verlag:</span> ${publisherLink ? `<a href="${publisherLink}" target="_blank" class="text-blue-600 hover:underline">${publisher}</a>` : publisher}</p>
               <p class="text-gray-700"><span class="font-semibold">Erscheinungsjahr:</span> ${publishedDate}</p>
               <p class="text-gray-700"><span class="font-semibold">ISBN:</span> ${isbn}</p>
+              <p class="text-gray-700"><span class="font-semibold">Format:</span> ${bookType}</p>
               <p class="${priceColor}"><span class="font-semibold">Preis:</span> ${priceLink ? `<a href="${priceLink}" target="_blank" class="hover:underline">${price}</a>` : price}</p>
             </div>
           `;
@@ -108,6 +131,7 @@
 
       } catch (error) {
         resultsDiv.innerHTML = '<p class="text-red-500 text-lg">Fehler beim Laden der Bücher.</p>';
+        resultCountDiv.textContent = '';
         console.error(error);
       }
     }
