@@ -1,21 +1,21 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <title>Brocki Buchsuche v1.1</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 750px; margin: 40px auto; padding: 10px; }
-    input, button { font-size: 1.1em; padding: 8px; margin-bottom: 10px; width: 100%; }
-    #result { margin-top: 20px; border-top:1px solid #ccc; padding-top:15px; }
-    .book { margin-bottom: 20px; padding-bottom: 10px; border-bottom:1px solid #ddd; display:flex; }
-    .cover { margin-right: 15px; }
-    .cover img { width: 120px; }
-    .info { flex: 1; }
-    a { display: inline-block; margin: 2px 5px 2px 0; color: #0066cc; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    #version { margin-top: 30px; font-size: 0.9em; color: #666; }
-    .eurobuch-form { margin-top: 10px; padding: 10px; border: 1px solid #aaa; background-color: #f0f0f0; width: fit-content; }
-  </style>
+<meta charset="UTF-8">
+<title>Brocki Buchsuche v1.3</title>
+<style>
+body { font-family: Arial, sans-serif; max-width: 750px; margin: 40px auto; padding: 10px; }
+input, button, select { font-size: 1.1em; padding: 8px; margin-bottom: 10px; width: 100%; }
+#result { margin-top: 20px; border-top:1px solid #ccc; padding-top:15px; }
+.book { margin-bottom: 20px; padding-bottom: 10px; border-bottom:1px solid #ddd; display:flex; }
+.cover { margin-right: 15px; }
+.cover img { width: 120px; }
+.info { flex: 1; }
+a { display: inline-block; margin: 2px 5px 2px 0; color: #0066cc; text-decoration: none; }
+a:hover { text-decoration: underline; }
+#version { margin-top: 30px; font-size: 0.9em; color: #666; }
+.eurobuch-form { margin-top: 10px; padding: 10px; border: 1px solid #aaa; background-color: #f0f0f0; width: fit-content; }
+</style>
 </head>
 <body>
 
@@ -26,9 +26,30 @@
 
 <div id="result"></div>
 
-<div id="version">Version 1.1</div>
+<div id="version">Version 1.3</div>
 
 <script>
+// Beispielhafte Preisliste (Neupreis in CHF)
+const priceList = {
+  "9780140449136": 35,
+  "9783453172793": 28,
+  "9783832180577": 22
+};
+
+// Faktor-Definitionen
+const zustandFactor = {
+  "wie neu": 1.2,
+  "sehr gut": 1.0,
+  "gut": 0.8,
+  "akzeptabel": 0.6,
+  "beschädigt": 0.4
+};
+const nachfrageFactor = {
+  "Bestseller": 1.3,
+  "Standard": 1.0,
+  "Nische": 0.8
+};
+
 async function searchBook() {
   const query = document.getElementById("searchText").value.trim();
   const resDiv = document.getElementById("result");
@@ -41,7 +62,6 @@ async function searchBook() {
   resDiv.innerHTML = "<p>🔍 Suche läuft…</p>";
 
   try {
-    // Open Library Suche
     const resp = await fetch("https://openlibrary.org/search.json?q=" + encodeURIComponent(query));
     const data = await resp.json();
 
@@ -50,32 +70,37 @@ async function searchBook() {
       return;
     }
 
-    const books = data.docs.slice(0, 5);
+    const books = data.docs.slice(0,5);
     let html = "";
 
     books.forEach(book => {
       const title = book.title || "–";
       const author = book.author_name ? book.author_name.join(", ") : "–";
       const isbn = book.isbn ? book.isbn[0] : "";
+      const pubYear = book.first_publish_year || new Date().getFullYear();
 
-      // Coverbild
       const coverUrl = isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg` : "";
 
-      // Fiktiver Neupreis
-      const neupreis = 25; // CHF
-      const verkaufspreis = (neupreis / 5).toFixed(2);
+      let neupreis = 25;
+      if(isbn && priceList[isbn]) neupreis = priceList[isbn];
 
-      // Shoplinks
-      const orellLink = `https://www.orellfuessli.ch/shop/home/search?q=${encodeURIComponent(query)}`;
-      const exlibrisLink = `https://www.exlibris.ch/de/suche?searchTerm=${encodeURIComponent(query)}`;
+      // Dropdowns für Zustand & Nachfrage
+      let zustandSelect = `<select class="zustand"><option value="wie neu">wie neu</option>
+<option value="sehr gut">sehr gut</option><option value="gut">gut</option>
+<option value="akzeptabel">akzeptabel</option><option value="beschädigt">beschädigt</option></select>`;
 
-      html += `<div class="book">
+      let nachfrageSelect = `<select class="nachfrage"><option value="Bestseller">Bestseller</option>
+<option value="Standard">Standard</option><option value="Nische">Nische</option></select>`;
+
+      html += `<div class="book" data-isbn="${isbn}" data-neupreis="${neupreis}" data-pubyear="${pubYear}">
         <div class="cover">${coverUrl ? `<img src="${coverUrl}" alt="Cover">` : "Kein Cover verfügbar"}</div>
         <div class="info">
           <h2>${title}</h2>
           <p><b>Autor:</b> ${author}</p>
           ${isbn ? `<p><b>ISBN:</b> ${isbn}</p>` : "<p>⚠️ Keine ISBN gefunden.</p>"}
-          <p>💰 Preisvorschlag: <b>${verkaufspreis} CHF</b> (1/5 vom Neupreis)</p>
+          <p>💰 Preisvorschlag: <span class="preisVorschlag">${(neupreis/5).toFixed(2)}</span> CHF</p>
+          <p>Zustand: ${zustandSelect}</p>
+          <p>Nachfrage: ${nachfrageSelect}</p>
           <p>
             <a href="https://www.melando.ch/de/books?search=${encodeURIComponent(query)}" target="_blank">Melando</a>
             <a href="https://www.medimops.de/search?query=${encodeURIComponent(query)}" target="_blank">Medimops</a>
@@ -83,67 +108,48 @@ async function searchBook() {
             <a href="https://www.buchplanet.ch/?s=${encodeURIComponent(query)}" target="_blank">Buchplanet</a>
           </p>
           <p>
-            <a href="${orellLink}" target="_blank">Orell Füssli</a>
-            <a href="${exlibrisLink}" target="_blank">Ex Libris</a>
+            <a href="https://www.orellfuessli.ch/shop/home/search?q=${encodeURIComponent(query)}" target="_blank">Orell Füssli</a>
+            <a href="https://www.exlibris.ch/de/suche?searchTerm=${encodeURIComponent(query)}" target="_blank">Ex Libris</a>
           </p>
         </div>
       </div>`;
 
-      // Eurobuch Formular dynamisch erzeugen
-      const euroForm = document.createElement("form");
-      euroForm.method = "post";
-      euroForm.action = "https://www.eurobuch.ch/search_results.php";
-      euroForm.target = "_blank";
-      euroForm.className = "eurobuch-form";
-
-      // Autor
-      const inputAuthor = document.createElement("input");
-      inputAuthor.type = "hidden";
-      inputAuthor.name = "author";
-      inputAuthor.value = author;
-      euroForm.appendChild(inputAuthor);
-
-      // Titel
-      const inputTitle = document.createElement("input");
-      inputTitle.type = "hidden";
-      inputTitle.name = "title";
-      inputTitle.value = title;
-      euroForm.appendChild(inputTitle);
-
-      // Volltext
-      const inputSearch = document.createElement("input");
-      inputSearch.type = "hidden";
-      inputSearch.name = "search";
-      inputSearch.value = title;
-      euroForm.appendChild(inputSearch);
-
-      // ISBN
-      const inputISBN = document.createElement("input");
-      inputISBN.type = "hidden";
-      inputISBN.name = "isbn";
-      inputISBN.value = isbn;
-      euroForm.appendChild(inputISBN);
-
-      // Submit Button
-      const submitBtn = document.createElement("input");
-      submitBtn.type = "submit";
-      submitBtn.value = "Auf Eurobuch suchen";
-      euroForm.appendChild(submitBtn);
-
-      html += euroForm.outerHTML;
     });
 
     resDiv.innerHTML = html;
 
-  } catch (err) {
+    // Preisberechnung bei Änderung
+    document.querySelectorAll('.book').forEach(bookDiv=>{
+      const preisSpan = bookDiv.querySelector('.preisVorschlag');
+      const zustandSel = bookDiv.querySelector('.zustand');
+      const nachfrageSel = bookDiv.querySelector('.nachfrage');
+      const neupreis = parseFloat(bookDiv.dataset.neupreis);
+      const pubYear = parseInt(bookDiv.dataset.pubyear);
+      const currentYear = new Date().getFullYear();
+
+      function updatePreis() {
+        let zust = zustandFactor[zustandSel.value] || 1.0;
+        let nachfrage = nachfrageFactor[nachfrageSel.value] || 1.0;
+        let alterF = 1 - ((currentYear - pubYear)*0.02);
+        alterF = Math.max(0.6, Math.min(alterF, 1.0));
+        const preis = (neupreis * zust * nachfrage * alterF).toFixed(2);
+        preisSpan.textContent = preis;
+      }
+
+      zustandSel.addEventListener('change', updatePreis);
+      nachfrageSel.addEventListener('change', updatePreis);
+      updatePreis();
+    });
+
+  } catch(err){
     console.error(err);
-    resDiv.innerHTML = "<p>⚠️ Fehler bei der Suche.</p>";
+    resDiv.innerHTML="<p>⚠️ Fehler bei der Suche.</p>";
   }
 }
 
 // Enter-Taste aktivieren
-document.getElementById("searchText").addEventListener("keydown", function(e) {
-  if (e.key === "Enter") searchBook();
+document.getElementById("searchText").addEventListener("keydown", function(e){
+  if(e.key === "Enter") searchBook();
 });
 </script>
 
