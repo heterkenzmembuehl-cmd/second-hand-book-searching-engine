@@ -65,12 +65,14 @@
         let html = "<h2>" + title + "</h2>";
         html += "<p><b>Autor:</b> " + author + "</p>";
 
-        // 🔗 Shop-Links
-        html += "<h3>📖 Preise anzeigen:</h3>";
-        html += "<a href='https://www.orellfuessli.ch/shop/home/search?q=" + isbn + "' target='_blank'>Neu-Preis bei Orell Füssli</a>";
-        html += "<a href='https://www.eurobuch.de/ISBN/SUCHE?q=" + isbn + "' target='_blank'>Preisvergleich bei Eurobuch</a>";
-        html += "<a href='https://www.amazon.de/s?k=" + isbn + "' target='_blank'>Amazon</a>";
-        html += "<a href='https://www.buch.ch/de/suche?query=" + isbn + "' target='_blank'>Buch.ch</a>";
+     // 🔗 Shop‑Links
+html += "<h3>📖 Preise & Shops:</h3>";
+html += "<a href='https://www.orellfuessli.ch/shop/home/search?q=" + isbn + "&search_by=isbn' target='_blank'>Orell Füssli Shop (Neupreis)</a>";
+html += "<a href='https://diebuchsuche.ch/?search=" + isbn + "' target='_blank'>DieBuchSuche.ch (Preisvergleich CH)</a>";
+html += "<a href='https://www.billigbuch.ch/search?term=" + isbn + "' target='_blank'>billigbuch.ch (Preisvergleich)</a>";
+html += "<a href='https://www.eurobuch.de/ISBN/SUCHE?q=" + isbn + "' target='_blank'>Eurobuch (Preisvergleich)</a>";
+html += "<a href='https://www.amazon.de/s?k=" + isbn + "' target='_blank'>Amazon.de</a>";
+
 
         resultDiv.innerHTML = html;
 
