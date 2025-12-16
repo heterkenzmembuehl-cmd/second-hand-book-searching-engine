@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Brocki Buchpreis-Suche</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 10px;
+    }
+    input, button {
+      font-size: 1.1em;
+      padding: 8px;
+    }
+    #result {
+      margin-top: 20px;
+      border-top: 1px solid #ccc;
+      padding-top: 15px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📚 Brocki Buchpreis-Suche</h1>
+
+  <input id="isbn" placeholder="ISBN eingeben">
+  <button onclick="searchBook()">Suchen</button>
+
+  <div id="result"></div>
+
+  <script>
+    async function searchBook() {
+      const isbn = document.getElementById("isbn").value.trim();
+      if (!isbn) return;
+
+      document.getElementById("result").innerHTML = "Suche läuft…";
+
+      try {
+        // 📘 Google Books
+        const gb = await fetch(
+          "https://www.googleapis.com/books/v1/volumes?q=isbn:" + isbn
+        );
+        const gbData = await gb.json();
+
+        if (!gbData.items) {
+          document.getElementById("result").innerHTML =
+            "❌ Buch nicht gefunden";
+          return;
+        }
+
+        const info = gbData.items[0].volumeInfo;
+        const sale = gbData.items[0].saleInfo;
+
+        const title = info.title || "–";
+        const author = info.authors ? info.authors.join(", ") : "–";
+
+        let marketPrice = "keine Angabe";
+        if (sale.listPrice) {
+          marketPrice = sale.listPrice.amount + " " + sale.listPrice.currencyCode;
+        }
+
+        // 💰 Brocki-Preisregel
+        let suggested = "–";
+        if (sale.listPrice) {
+          suggested = Math.round(sale.listPrice.amount * 0.6) + " CHF";
+        }
+
+        document.getElementById("result").innerHTML = `
+          <h2>${title}</h2>
+          <p><b>Autor:</b> ${author}</p>
+          <p><b>Marktpreis:</b> ${marketPrice}</p>
+          <p><b>💡 Preisvorschlag:</b> ${suggested}</p>
+        `;
+      } catch (e) {
+        document.getElementById("result").innerHTML =
+          "⚠️ Fehler bei der Suche";
+      }
+    }
+  </script>
+
+</body>
+</html>
