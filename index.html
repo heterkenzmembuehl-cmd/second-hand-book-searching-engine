@@ -13,11 +13,21 @@
     input, button {
       font-size: 1.1em;
       padding: 8px;
+      margin-right: 5px;
     }
     #result {
       margin-top: 20px;
       border-top: 1px solid #ccc;
       padding-top: 15px;
+    }
+    a {
+      display: block;
+      margin: 5px 0;
+      color: #0066cc;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
@@ -34,48 +44,39 @@
     async function searchBook() {
       const isbn = document.getElementById("isbn").value.trim();
       if (!isbn) return;
-
-      document.getElementById("result").innerHTML = "Suche läuft…";
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerHTML = "🔍 Suche läuft…";
 
       try {
-        // 📘 Google Books
-        const gb = await fetch(
-          "https://www.googleapis.com/books/v1/volumes?q=isbn:" + isbn
-        );
+        // 📘 Google Books API
+        const gb = await fetch("https://www.googleapis.com/books/v1/volumes?q=isbn:" + isbn);
         const gbData = await gb.json();
 
         if (!gbData.items) {
-          document.getElementById("result").innerHTML =
-            "❌ Buch nicht gefunden";
+          resultDiv.innerHTML = "❌ Buch nicht gefunden";
           return;
         }
 
         const info = gbData.items[0].volumeInfo;
-        const sale = gbData.items[0].saleInfo;
-
         const title = info.title || "–";
         const author = info.authors ? info.authors.join(", ") : "–";
 
-        let marketPrice = "keine Angabe";
-        if (sale.listPrice) {
-          marketPrice = sale.listPrice.amount + " " + sale.listPrice.currencyCode;
-        }
+        // HTML-Ausgabe
+        let html = "<h2>" + title + "</h2>";
+        html += "<p><b>Autor:</b> " + author + "</p>";
 
-        // 💰 Brocki-Preisregel
-        let suggested = "–";
-        if (sale.listPrice) {
-          suggested = Math.round(sale.listPrice.amount * 0.6) + " CHF";
-        }
+        // 🔗 Shop-Links
+        html += "<h3>📖 Preise anzeigen:</h3>";
+        html += "<a href='https://www.orellfuessli.ch/shop/home/search?q=" + isbn + "' target='_blank'>Neu-Preis bei Orell Füssli</a>";
+        html += "<a href='https://www.eurobuch.de/ISBN/SUCHE?q=" + isbn + "' target='_blank'>Preisvergleich bei Eurobuch</a>";
+        html += "<a href='https://www.amazon.de/s?k=" + isbn + "' target='_blank'>Amazon</a>";
+        html += "<a href='https://www.buch.ch/de/suche?query=" + isbn + "' target='_blank'>Buch.ch</a>";
 
-        document.getElementById("result").innerHTML = `
-          <h2>${title}</h2>
-          <p><b>Autor:</b> ${author}</p>
-          <p><b>Marktpreis:</b> ${marketPrice}</p>
-          <p><b>💡 Preisvorschlag:</b> ${suggested}</p>
-        `;
+        resultDiv.innerHTML = html;
+
       } catch (e) {
-        document.getElementById("result").innerHTML =
-          "⚠️ Fehler bei der Suche";
+        resultDiv.innerHTML = "⚠️ Fehler bei der Suche";
+        console.error(e);
       }
     }
   </script>
