@@ -2,78 +2,84 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Brocki Buchsuche mit Preisvorschlag</title>
+  <title>Brocki Buchsuche mit API</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: 40px auto;
-      padding: 10px;
-    }
-    input, button {
-      font-size: 1.1em;
-      padding: 8px;
-      margin-bottom: 10px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    #result {
-      margin-top: 20px;
-      border-top: 1px solid #ccc;
-      padding-top: 15px;
-    }
-    a {
-      display: block;
-      margin: 5px 0;
-      color: #0066cc;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
+    body { font-family: Arial,sans-serif; max-width: 650px; margin: 40px auto; padding:10px;}
+    input, button { font-size:1.1em; padding:8px; margin-bottom:10px; width:100%;}
+    #result { margin-top:20px; border-top:1px solid #ccc; padding-top:15px;}
   </style>
 </head>
 <body>
 
-  <h1>📚 Brocki Buchsuche mit Preisvorschlag</h1>
+<h1>📚 Brocki Book API‑Suche</h1>
 
-  <input id="searchText" placeholder="ISBN, Titel oder Autor eingeben">
-  <button onclick="searchBook()">Suchen</button>
+<input id="searchText" placeholder="ISBN, Titel oder Autor">
+<button onclick="searchBook()">Suchen</button>
 
-  <div id="result"></div>
+<div id="result"></div>
 
-  <script>
-    function searchBook() {
-      const query = document.getElementById("searchText").value.trim();
-      const resultDiv = document.getElementById("result");
+<script>
+async function searchBook() {
+  const query = document.getElementById("searchText").value.trim();
+  const resDiv = document.getElementById("result");
 
-      if (!query) {
-        resultDiv.innerHTML = "<p>Bitte zuerst etwas eingeben.</p>";
-        return;
-      }
+  if (!query) {
+    resDiv.innerHTML = "<p>Bitte zuerst etwas eingeben.</p>";
+    return;
+  }
+  resDiv.innerHTML = "<p>🔍 Suche läuft…</p>";
 
-      resultDiv.innerHTML = "<p>🔍 Suche läuft…</p>";
+  try {
+    // ======= Schritt 1: Open Library Suche =======
+    const openResp = await fetch(
+      "https://openlibrary.org/search.json?q=" + encodeURIComponent(query)
+    );
+    const openData = await openResp.json();
 
-      // EncodeURIComponent für URL
-      const encodedQuery = encodeURIComponent(query);
-
-      // Shop-Links
-      const orellLink = "https://www.orellfuessli.ch/shop/home/search?q=" + encodedQuery;
-      const exlibrisLink = "https://www.exlibris.ch/de/suche?searchTerm=" + encodedQuery;
-
-      // Fiktiver Neupreis (kann später aus Datenbank/JSON kommen)
-      const neupreis = 25; // Beispielpreis in CHF
-      const verkaufspreis = (neupreis / 5).toFixed(2);
-
-      // Ausgabe
-      let html = "<h3>Ergebnisse:</h3>";
-      html += "<p>Gefunden bei <b>Orell Füssli</b>: <a href='" + orellLink + "' target='_blank'>Link anklicken</a></p>";
-      html += "<p>Gefunden bei <b>Ex Libris</b>: <a href='" + exlibrisLink + "' target='_blank'>Link anklicken</a></p>";
-      html += "<p>💰 Preisvorschlag: <b>" + verkaufspreis + " CHF</b> (1/5 vom Neupreis)</p>";
-
-      resultDiv.innerHTML = html;
+    if (!openData.docs || openData.docs.length === 0) {
+      resDiv.innerHTML = "<p>❌ Keine Daten gefunden.</p>";
+      return;
     }
-  </script>
+
+    const first = openData.docs[0];
+    const title = first.title || "–";
+    const author = first.author_name ? first.author_name.join(", ") : "–";
+    const isbn = first.isbn ? first.isbn[0] : null;
+
+    let html = `<h2>${title}</h2><p><b>Autor:</b> ${author}</p>`;
+
+    if (!isbn) {
+      html += "<p>⚠️ Keine ISBN gefunden.</p>";
+      resDiv.innerHTML = html;
+      return;
+    }
+
+    html += `<p><b>ISBN:</b> ${isbn}</p>`;
+
+    // ======= Schritt 2: ValoreBooks Preis =======
+    const priceResp = await fetch(
+      "https://api.valorebooks.com/sellback/pricing/best/" + isbn
+    );
+    if (!priceResp.ok) {
+      html += "<p>⚠️ Kein ValoreBooks‑Preis verfügbar.</p>";
+    } else {
+      const priceJson = await priceResp.json();
+      const bestPrice = priceJson.price || 0;
+      const suggested = (bestPrice / 5).toFixed(2);
+
+      html +=
+        `<p>💰 Markt‑Preis (ValoreBooks): <b>${bestPrice} USD</b></p>` +
+        `<p>💡 Preisvorschlag (1/5): <b>${suggested} USD</b></p>`;
+    }
+
+    resDiv.innerHTML = html;
+
+  } catch (err) {
+    console.error(err);
+    resDiv.innerHTML = "<p>⚠️ Fehler bei der Suche.</p>";
+  }
+}
+</script>
 
 </body>
 </html>
